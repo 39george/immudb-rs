@@ -1,0 +1,24 @@
+[package]
+name = "immudb-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# gRPC
+tonic = { version = "0.14" }
+prost = { version = "0.14" }
+prost-types = { version = "0.14" }
+
+anyhow = { version = "1.0" }
+thiserror = { version = "2.0" }
+tokio = { version = "1.47" }
+serde_json = { version = "1.0" }
+serde = { version = "1.0" }
+async-trait = { version = "0.1.89" }
+bon = { version = "3.7" }
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
