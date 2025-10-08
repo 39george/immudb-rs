@@ -14,12 +14,12 @@ use crate::model::{
 };
 use crate::schema::{DatabaseListRequestV2, DatabaseListResponseV2};
 
+use super::Result;
 use super::protocol::model;
 use super::protocol::model::authorization_service_client::AuthorizationServiceClient;
 use super::protocol::model::document_service_client::DocumentServiceClient;
 use super::protocol::schema;
 use super::protocol::schema::immu_service_client::ImmuServiceClient;
-use super::Result;
 
 mod conv;
 

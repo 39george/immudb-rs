@@ -10,23 +10,23 @@ pub struct CreateCollectionRequest {
     #[prost(message, repeated, tag = "4")]
     pub indexes: ::prost::alloc::vec::Vec<Index>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CreateCollectionResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct Field {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     #[prost(enumeration = "FieldType", tag = "2")]
     pub r#type: i32,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct Index {
     #[prost(string, repeated, tag = "1")]
     pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(bool, tag = "2")]
     pub is_unique: bool,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct GetCollectionRequest {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -47,48 +47,48 @@ pub struct Collection {
     #[prost(message, repeated, tag = "4")]
     pub indexes: ::prost::alloc::vec::Vec<Index>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct GetCollectionsRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetCollectionsResponse {
     #[prost(message, repeated, tag = "1")]
     pub collections: ::prost::alloc::vec::Vec<Collection>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DeleteCollectionRequest {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DeleteCollectionResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct UpdateCollectionRequest {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub document_id_field_name: ::prost::alloc::string::String,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct UpdateCollectionResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AddFieldRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
     pub field: ::core::option::Option<Field>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AddFieldResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RemoveFieldRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub field_name: ::prost::alloc::string::String,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RemoveFieldResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CreateIndexRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
@@ -97,16 +97,16 @@ pub struct CreateIndexRequest {
     #[prost(bool, tag = "3")]
     pub is_unique: bool,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CreateIndexResponse {}
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DeleteIndexRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
     #[prost(string, repeated, tag = "2")]
     pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DeleteIndexResponse {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InsertDocumentsRequest {
@@ -115,7 +115,7 @@ pub struct InsertDocumentsRequest {
     #[prost(message, repeated, tag = "2")]
     pub documents: ::prost::alloc::vec::Vec<::prost_types::Struct>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct InsertDocumentsResponse {
     #[prost(uint64, tag = "1")]
     pub transaction_id: u64,
@@ -139,7 +139,7 @@ pub struct DeleteDocumentsRequest {
     #[prost(message, optional, tag = "1")]
     pub query: ::core::option::Option<Query>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DeleteDocumentsResponse {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SearchDocumentsRequest {
@@ -179,7 +179,7 @@ pub struct FieldComparison {
     #[prost(message, optional, tag = "3")]
     pub value: ::core::option::Option<::prost_types::Value>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct OrderByClause {
     #[prost(string, tag = "1")]
     pub field: ::prost::alloc::string::String,
@@ -210,7 +210,7 @@ pub struct DocumentAtRevision {
     #[prost(int64, tag = "7")]
     pub ts: i64,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct DocumentMetadata {
     #[prost(bool, tag = "1")]
     pub deleted: bool,
@@ -220,12 +220,12 @@ pub struct CountDocumentsRequest {
     #[prost(message, optional, tag = "1")]
     pub query: ::core::option::Option<Query>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CountDocumentsResponse {
     #[prost(int64, tag = "1")]
     pub count: i64,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct AuditDocumentRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
@@ -245,7 +245,7 @@ pub struct AuditDocumentResponse {
     #[prost(message, repeated, tag = "1")]
     pub revisions: ::prost::alloc::vec::Vec<DocumentAtRevision>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ProofDocumentRequest {
     #[prost(string, tag = "1")]
     pub collection_name: ::prost::alloc::string::String,
@@ -454,7 +454,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/CreateCollection",
             );
@@ -480,7 +480,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/GetCollections",
             );
@@ -506,7 +506,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/GetCollection",
             );
@@ -532,7 +532,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/UpdateCollection",
             );
@@ -558,7 +558,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/DeleteCollection",
             );
@@ -584,7 +584,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/AddField",
             );
@@ -608,7 +608,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/RemoveField",
             );
@@ -632,7 +632,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/CreateIndex",
             );
@@ -656,7 +656,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/DeleteIndex",
             );
@@ -680,7 +680,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/InsertDocuments",
             );
@@ -706,7 +706,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/ReplaceDocuments",
             );
@@ -732,7 +732,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/DeleteDocuments",
             );
@@ -758,7 +758,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/SearchDocuments",
             );
@@ -784,7 +784,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/CountDocuments",
             );
@@ -810,7 +810,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/AuditDocument",
             );
@@ -836,7 +836,7 @@ pub mod document_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.DocumentService/ProofDocument",
             );
@@ -1082,7 +1082,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CreateCollectionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1128,7 +1128,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = GetCollectionsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1174,7 +1174,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = GetCollectionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1220,7 +1220,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = UpdateCollectionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1266,7 +1266,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = DeleteCollectionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1311,7 +1311,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = AddFieldSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1356,7 +1356,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = RemoveFieldSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1401,7 +1401,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CreateIndexSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1446,7 +1446,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = DeleteIndexSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1492,7 +1492,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = InsertDocumentsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1538,7 +1538,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = ReplaceDocumentsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1584,7 +1584,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = DeleteDocumentsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1630,7 +1630,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = SearchDocumentsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1676,7 +1676,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CountDocumentsSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1722,7 +1722,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = AuditDocumentSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1768,7 +1768,7 @@ pub mod document_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = ProofDocumentSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -1823,7 +1823,7 @@ pub mod document_service_server {
         const NAME: &'static str = SERVICE_NAME;
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct OpenSessionRequest {
     #[prost(string, tag = "1")]
     pub username: ::prost::alloc::string::String,
@@ -1832,7 +1832,7 @@ pub struct OpenSessionRequest {
     #[prost(string, tag = "3")]
     pub database: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct OpenSessionResponse {
     #[prost(string, tag = "1")]
     pub session_id: ::prost::alloc::string::String,
@@ -1843,13 +1843,13 @@ pub struct OpenSessionResponse {
     #[prost(int32, tag = "4")]
     pub inactivity_timestamp: i32,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct KeepAliveRequest {}
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct KeepAliveResponse {}
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CloseSessionRequest {}
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct CloseSessionResponse {}
 /// Generated client implementations.
 pub mod authorization_service_client {
@@ -1957,7 +1957,7 @@ pub mod authorization_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.AuthorizationService/OpenSession",
             );
@@ -1983,7 +1983,7 @@ pub mod authorization_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.AuthorizationService/KeepAlive",
             );
@@ -2009,7 +2009,7 @@ pub mod authorization_service_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/immudb.model.AuthorizationService/CloseSession",
             );
@@ -2165,7 +2165,7 @@ pub mod authorization_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = OpenSessionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -2211,7 +2211,7 @@ pub mod authorization_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = KeepAliveSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,
@@ -2257,7 +2257,7 @@ pub mod authorization_service_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CloseSessionSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
+                        let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
                                 accept_compression_encodings,

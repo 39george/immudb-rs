@@ -8,4 +8,4 @@ pub enum Error {
     Transport(#[from] tonic::transport::Error),
 }
 
-common::impl_debug!(Error);
+crate::impl_debug!(Error);
