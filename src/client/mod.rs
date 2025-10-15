@@ -16,7 +16,7 @@ use super::protocol::schema;
 use super::protocol::schema::immu_service_client::ImmuServiceClient;
 
 #[derive(Debug, Clone, Builder)]
-#[builder(finish_fn(name = build_internal))]
+#[builder(finish_fn(vis = "", name = build_internal))]
 pub struct ConnectOptions {
     #[builder(into, default = String::from("immudb"))]
     pub username: String,
