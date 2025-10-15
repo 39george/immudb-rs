@@ -1,28 +1,26 @@
-use immudb_rs::builder::{CreateCollection, Field, FieldType, SearchDocuments};
-use immudb_rs::ImmuDB;
-use immudb_rs::Interface;
+use immudb_rs::document::builder::{
+    CreateCollection, Field, FieldType, SearchDocuments,
+};
+use immudb_rs::{ImmuDB, Result};
 use serde_json::json;
 
 #[tokio::main]
-pub async fn main() -> anyhow::Result<()> {
-    // 1. Инициализация клиента
-    let client = ImmuDB::new(
-        "http://localhost:3322".parse().unwrap(),
-        "immudb",
-        "immudb",
-        "defaultdb",
-    )
-    .await?;
+async fn main() -> Result<()> {
+    let client = ImmuDB::builder()
+        .username("immudb")
+        .password("immudb")
+        .database("defaultdb")
+        .connect("http://localhost:3322")
+        .await?;
+
+    let mut doc = client.doc();
 
     let collection_name = "UserDocumentsBuilder";
 
-    println!("--- 1. Очистка и создание коллекции через Builder ---");
+    // NB: Pub method
+    let _ = doc.delete_collection(collection_name).await;
 
-    // 1.1. Очистка (для идемпотентности)
-    let _ = client.delete_collection(collection_name).await;
-    println!("Старая коллекция удалена (если существовала).");
-
-    // 1.2. Создание коллекции (Новый Builder Interface)
+    // 1.2. Создание коллекции (новый Builder Interface)
     CreateCollection::name(collection_name)
         .document_id_field_name("my_id")
         .field(
@@ -38,31 +36,19 @@ pub async fn main() -> anyhow::Result<()> {
                 .indexed(true)
                 .build(),
         )
-        .create(&client)
+        .create(&mut doc)
         .await?;
 
-    println!(
-        "Коллекция '{}' успешно создана через Builder.",
-        collection_name
-    );
+    doc.insert_documents(
+        collection_name,
+        vec![json!({
+            "group_id": "mpc_group_a",
+            "value": "Zm9vYmFyCg==",
+            "is_active": true
+        })],
+    )
+    .await?;
 
-    println!("\n--- 2. Вставка документа ---");
-    client
-        .insert_documents(
-            collection_name,
-            vec![json!({
-                "group_id": "mpc_group_a",
-                "value": "Zm9vYmFyCg==",
-                "is_active": true
-            })],
-        )
-        .await
-        .unwrap();
-
-    println!("Документ (my_id: key_001) успешно вставлен.");
-
-    println!("\n--- 3. Поиск документа через Search Builder ---");
-    // 3. Поиск документа (Новый SearchDocuments Builder Interface)
     let search_json = json!({
         "collection_name": collection_name,
         "limit": 50,
@@ -77,15 +63,13 @@ pub async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let docs = SearchDocuments::query(search_json) // Начало с обязательного Query
+    let docs = SearchDocuments::query(search_json)
         .page(1)
         .page_size(10)
-        // .search_id("cursor_id") // Если задать, keep_open будет true автоматически!
-        .execute(&client) // Вызываем execute через Interface
+        .execute(&mut doc)
         .await?;
 
-    println!("Результаты поиска (найдено {} документов):", docs.len());
-    println!("{docs:?}");
+    println!("{docs:#?}");
 
     Ok(())
 }

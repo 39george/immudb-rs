@@ -5,13 +5,14 @@ use crate::model::FieldType;
 use crate::model::Index;
 use crate::model::OrderByClause;
 use crate::model::Query;
-use anyhow::anyhow;
-use anyhow::bail;
 use serde_json::Value;
 
-impl From<crate::builder::FieldType> for i32 {
-    fn from(val: crate::builder::FieldType) -> Self {
-        use crate::builder::FieldType;
+use crate::Result;
+use crate::error::Error;
+
+impl From<super::builder::FieldType> for i32 {
+    fn from(val: super::builder::FieldType) -> Self {
+        use super::builder::FieldType;
         match val {
             FieldType::String => crate::model::FieldType::String as i32,
             FieldType::Boolean => crate::model::FieldType::Boolean as i32,
@@ -27,10 +28,8 @@ pub struct ProtobufFieldParts {
     pub(super) proto_index: Option<crate::model::Index>,
 }
 
-impl TryFrom<crate::builder::Field> for ProtobufFieldParts {
-    type Error = anyhow::Error;
-
-    fn try_from(val: crate::builder::Field) -> Result<Self, Self::Error> {
+impl From<super::builder::Field> for ProtobufFieldParts {
+    fn from(val: super::builder::Field) -> Self {
         let proto_field = crate::model::Field {
             name: val.name.clone(),
             r#type: val.field_type.into(),
@@ -45,10 +44,10 @@ impl TryFrom<crate::builder::Field> for ProtobufFieldParts {
             None
         };
 
-        Ok(ProtobufFieldParts {
+        ProtobufFieldParts {
             proto_field,
             proto_index,
-        })
+        }
     }
 }
 
@@ -105,16 +104,20 @@ fn prost_to_serde_json(x: prost_types::Value) -> serde_json::Value {
     }
 }
 
-pub fn json_to_immudb_query(json_query: Value) -> anyhow::Result<Query> {
+pub fn json_to_immudb_query(json_query: Value) -> Result<Query> {
     let map = match json_query {
         Value::Object(m) => m,
-        _ => bail!("Query must be a JSON object"),
+        _ => {
+            return Err(Error::InvalidInput(
+                "Query must be a JSON object".into(),
+            ));
+        }
     };
 
     let collection_name = map
         .get("collection_name")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("Missing 'collection_name'"))?
+        .ok_or_else(|| Error::InvalidInput("Missing 'collection_name'".into()))?
         .to_string();
 
     let limit = map.get("limit").and_then(Value::as_u64).unwrap_or(100) as u32; // Устанавливаем разумный дефолт
@@ -135,18 +138,17 @@ pub fn json_to_immudb_query(json_query: Value) -> anyhow::Result<Query> {
         })
         .unwrap_or_default();
 
-    // --- Обработка секции WHERE (expressions) ---
     let mut expressions = Vec::new();
     if let Some(where_clause) = map.get("where").and_then(Value::as_object) {
-        // Мы предполагаем, что immudb использует "AND" логику для списка expressions.
-        // Поэтому мы ищем поле "AND" в WHERE.
+        // Does immudb use "AND" logic for expressions list?
+        // Try to find "AND" in WHERE.
         if let Some(and_array) =
             where_clause.get("AND").and_then(Value::as_array)
         {
             for item in and_array {
                 if let Some(comparison_map) = item.as_object() {
-                    // Каждое сравнение (FieldComparison) становится отдельным QueryExpression
-                    // в списке expressions, реализуя логику AND.
+                    // Each FieldComparison becomes QueryExpression
+                    // in expressions list.
                     let comparison = json_to_field_comparison(comparison_map)?;
                     expressions.push(model::QueryExpression {
                         field_comparisons: vec![comparison],
@@ -154,8 +156,7 @@ pub fn json_to_immudb_query(json_query: Value) -> anyhow::Result<Query> {
                 }
             }
         }
-        // TODO: Здесь можно добавить логику для "OR" или других сложных выражений,
-        // если immudb их поддерживает через вложенные QueryExpression.
+        // TODO: Can add "OR" logic or any other complex logic
     }
 
     Ok(Query {
@@ -166,22 +167,21 @@ pub fn json_to_immudb_query(json_query: Value) -> anyhow::Result<Query> {
     })
 }
 
-// Хелпер для создания QueryExpression (FieldComparison)
 fn json_to_field_comparison(
     json_map: &serde_json::Map<String, Value>,
-) -> anyhow::Result<model::FieldComparison> {
+) -> Result<model::FieldComparison> {
     let field = json_map
         .get("field")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("Missing 'field'"))?
+        .ok_or_else(|| Error::InvalidInput("Missing 'field'".into()))?
         .to_string();
     let op = json_map
         .get("op")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("Missing 'op'"))?;
+        .ok_or_else(|| Error::InvalidInput("Missing 'op'".into()))?;
     let value = json_map
         .get("value")
-        .ok_or_else(|| anyhow!("Missing 'value'"))?
+        .ok_or_else(|| Error::InvalidInput("Missing 'value'".into()))?
         .clone();
 
     Ok(model::FieldComparison {
@@ -191,9 +191,7 @@ fn json_to_field_comparison(
     })
 }
 
-fn map_operator(op: &str) -> anyhow::Result<i32> {
-    // В реальном коде используйте сгенерированный enum immudb::model::ComparisonOperator
-    // Мы будем использовать i32, как указано в вашем Question-коде.
+fn map_operator(op: &str) -> Result<i32> {
     match op.to_uppercase().as_str() {
         "EQ" => Ok(0), // ComparisonOperator::EQ as i32
         "NE" => Ok(1), // ComparisonOperator::NE as i32
@@ -201,64 +199,71 @@ fn map_operator(op: &str) -> anyhow::Result<i32> {
         "GE" => Ok(3), // ComparisonOperator::GE as i32
         "LT" => Ok(4), // ComparisonOperator::LT as i32
         "LE" => Ok(5), // ComparisonOperator::LE as i32
-        _ => bail!("Unknown comparison operator: {}", op),
+        _ => Err(Error::InvalidInput(format!(
+            "Unknown comparison operator: {}",
+            op
+        ))),
     }
 }
 
-/// Конвертирует строку типа в Prost FieldType
-fn parse_field_type(type_str: &str) -> anyhow::Result<FieldType> {
+fn parse_field_type(type_str: &str) -> Result<FieldType> {
     match type_str.to_uppercase().as_str() {
         "STRING" | "STR" => Ok(FieldType::String),
         "BOOLEAN" | "BOOL" => Ok(FieldType::Boolean),
         "INTEGER" | "INT" => Ok(FieldType::Integer),
         "DOUBLE" | "FLOAT" => Ok(FieldType::Double),
         "UUID" => Ok(FieldType::Uuid),
-        _ => bail!("Unknown field type: {}", type_str),
+        _ => Err(Error::InvalidInput(format!(
+            "unknown field type: {}",
+            type_str
+        ))),
     }
 }
 
-/// Создает CreateCollectionRequest из JSON-схемы
 pub fn json_to_create_collection_request(
     json_schema: Value,
-) -> anyhow::Result<CreateCollectionRequest> {
+) -> Result<CreateCollectionRequest> {
     let map = json_schema
         .as_object()
-        .ok_or_else(|| anyhow!("Root must be an object"))?;
+        .ok_or_else(|| Error::InvalidInput("root must be an object".into()))?;
 
     let name = map
         .get("name")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("Missing or invalid 'name'"))?
+        .ok_or_else(|| Error::InvalidInput("Missing or invalid 'name'".into()))?
         .to_string();
 
     let document_id_field_name = map
         .get("document_id_field_name")
         .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("Missing or invalid 'document_id_field_name'"))?
+        .ok_or_else(|| {
+            Error::InvalidInput(
+                "Missing or invalid 'document_id_field_name'".into(),
+            )
+        })?
         .to_string();
 
-    let fields_json = map
-        .get("fields")
-        .and_then(Value::as_array)
-        .ok_or_else(|| anyhow!("Missing or invalid 'fields' array"))?;
+    let fields_json =
+        map.get("fields").and_then(Value::as_array).ok_or_else(|| {
+            Error::InvalidInput("Missing or invalid 'fields' array".into())
+        })?;
 
     let mut fields: Vec<Field> = Vec::new();
     let mut indexes: Vec<Index> = Vec::new();
 
-    // 1. Проходим по всем полям, создавая Field и Index (если требуется)
     for field_def in fields_json {
-        let def = field_def
-            .as_object()
-            .ok_or_else(|| anyhow!("Field definition must be an object"))?;
+        let def = field_def.as_object().ok_or_else(|| {
+            Error::InvalidInput("Field definition must be an object".into())
+        })?;
         let field_name = def
             .get("name")
             .and_then(Value::as_str)
-            .ok_or_else(|| anyhow!("Field 'name' missing"))?
+            .ok_or_else(|| Error::InvalidInput("Field 'name' missing".into()))?
             .to_string();
-        let type_str = def
-            .get("type")
-            .and_then(Value::as_str)
-            .ok_or_else(|| anyhow!("Field 'type' missing"))?;
+        let type_str =
+            def.get("type").and_then(Value::as_str).ok_or_else(|| {
+                Error::InvalidInput("Field 'type' missing".into())
+            })?;
 
         let field_type = parse_field_type(type_str)?;
 
@@ -267,12 +272,9 @@ pub fn json_to_create_collection_request(
             r#type: field_type.into(),
         });
 
-        // 2. Проверяем, нужно ли это поле индексировать
         if def.get("indexed").and_then(Value::as_bool).unwrap_or(false)
             || field_name == document_id_field_name
         {
-            // Всегда индексируем Document ID
-
             let is_unique =
                 def.get("unique").and_then(Value::as_bool).unwrap_or(false)
                     || field_name == document_id_field_name;

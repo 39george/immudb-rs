@@ -1,13 +1,15 @@
 pub use client::ImmuDB;
-pub use interface::Interface;
 pub use protocol::model;
 pub use protocol::schema;
 
-pub mod builder;
 mod client;
 mod error;
-mod interface;
+mod interceptor;
 mod protocol;
+
+pub mod document;
+mod keyval;
+mod sql;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 

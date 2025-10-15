@@ -1,4 +1,5 @@
-use super::interface::Interface;
+use crate::document::DocClient;
+
 use super::Result;
 
 // ─────────────────────────── Create Collection ──────────────────────────── //
@@ -51,9 +52,9 @@ impl<S> CreateCollectionBuilder<S>
 where
     S: create_collection_builder::IsComplete,
 {
-    pub async fn create<I: Interface>(self, interface: &I) -> Result<()> {
+    pub async fn create(self, doc: &mut DocClient) -> Result<()> {
         let collection = self.build_internal();
-        interface.create_collection(collection).await
+        doc.create_collection(collection).await
     }
 }
 
@@ -81,9 +82,9 @@ impl<S> SearchDocumentsBuilder<S>
 where
     S: search_documents_builder::IsComplete,
 {
-    pub async fn execute<I: Interface>(
+    pub async fn execute(
         self,
-        interface: &I,
+        doc: &mut DocClient,
     ) -> Result<Vec<crate::model::DocumentAtRevision>> {
         let mut param = self.build_internal();
 
@@ -91,6 +92,6 @@ where
             param.keep_open = true;
         }
 
-        interface.search_document(param).await
+        doc.search_document(param).await
     }
 }

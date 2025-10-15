@@ -9,7 +9,7 @@ tonic = { version = "0.14" }
 prost = { version = "0.14" }
 prost-types = { version = "0.14" }
 
-anyhow = { version = "1.0" }
+http = "1.3"
 thiserror = { version = "2.0" }
 tokio = { version = "1.47", features = ["rt-multi-thread"] }
 serde_json = { version = "1.0" }
@@ -17,6 +17,9 @@ serde = { version = "1.0" }
 async-trait = { version = "0.1.89" }
 bon = { version = "3.7" }
 tonic-prost = "0.14"
+uuid = "1.18"
+base64 = "0.22"
+time = { version = "0.3", features = ["local-offset", "macros", "parsing", "serde", "formatting"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14"
