@@ -8,8 +8,8 @@ mod interceptor;
 mod protocol;
 
 pub mod document;
-mod keyval;
-mod sql;
+pub mod keyval;
+pub mod sql;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
