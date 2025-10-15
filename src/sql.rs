@@ -3,8 +3,10 @@ use base64::prelude::BASE64_STANDARD;
 use serde::de::DeserializeOwned;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::borrow::Cow;
+use std::pin::Pin;
 use time::{OffsetDateTime, UtcOffset};
-use tonic::Status;
+use tonic::metadata::{Ascii, MetadataValue};
+use tonic::{Request, Status};
 use uuid::Uuid;
 
 use crate::Result;
@@ -15,6 +17,9 @@ use crate::protocol::schema::{
     NamedParam, SqlExecRequest, SqlExecResult, SqlQueryRequest, SqlQueryResult,
     SqlValue, immu_service_client::ImmuServiceClient, sql_value,
 };
+use crate::schema::{NewTxRequest, NewTxResponse, TxMode};
+
+type BoxFut<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 
 /// Request params (@name -> SqlValue)
 #[derive(Debug, Clone)]
@@ -310,13 +315,23 @@ pub struct SqlClient {
             SessionInterceptor,
         >,
     >,
+    tx_id: Option<MetadataValue<Ascii>>,
 }
 
 impl SqlClient {
     pub fn new(db: &ImmuDB) -> Self {
         Self {
             inner: db.raw_main(),
+            tx_id: None,
         }
+    }
+
+    fn req_with_tx<T>(&self, payload: T) -> Request<T> {
+        let mut req = Request::new(payload);
+        if let Some(tx) = &self.tx_id {
+            req.metadata_mut().insert("transactionid", tx.clone());
+        }
+        req
     }
 
     /// Execute DDL/DML; can handle multiple expressions at a time (with BEGIN/COMMIT)
@@ -325,15 +340,18 @@ impl SqlClient {
         sql: impl Into<String>,
         params: Params,
     ) -> Result<SqlExecResult> {
-        let resp = self
-            .inner
-            .sql_exec(SqlExecRequest {
-                sql: sql.into(),
-                params: params.into_inner(),
-                no_wait: false,
-            })
-            .await?
-            .into_inner();
+        let req = SqlExecRequest {
+            sql: sql.into(),
+            params: params.into_inner(),
+            no_wait: false,
+        };
+        let resp = if self.tx_id.is_some() {
+            let req = self.req_with_tx(req);
+            let _ = self.inner.tx_sql_exec(req).await?;
+            SqlExecResult::default()
+        } else {
+            self.inner.sql_exec(req).await?.into_inner()
+        };
         Ok(resp)
     }
 
@@ -343,16 +361,19 @@ impl SqlClient {
         sql: impl Into<String>,
         params: Params,
     ) -> Result<QueryResult> {
-        let mut stream = self
-            .inner
-            .sql_query(SqlQueryRequest {
-                sql: sql.into(),
-                params: params.into_inner(),
-                accept_stream: true,
-                ..Default::default()
-            })
-            .await?
-            .into_inner();
+        let req = SqlQueryRequest {
+            sql: sql.into(),
+            params: params.into_inner(),
+            accept_stream: true,
+            ..Default::default()
+        };
+
+        let mut stream = if self.tx_id.is_some() {
+            let req = self.req_with_tx(req);
+            self.inner.tx_sql_query(req).await?.into_inner()
+        } else {
+            self.inner.sql_query(req).await?.into_inner()
+        };
 
         let mut columns_meta: Vec<Column> = Vec::new();
         let mut rows: Vec<Row> = Vec::new();
@@ -401,36 +422,52 @@ impl SqlClient {
     }
 
     /// Simple transaction (server keeps ongoing_tx in session)
-    pub async fn begin(&mut self) -> Result<()> {
-        let r = self.exec("BEGIN TRANSACTION;", Params::new()).await?;
-        if !r.ongoing_tx {
-            return Err(Error::Unexpected("failed to begin tx".into()));
-        }
+    #[tracing::instrument(skip_all)]
+    pub async fn begin(&mut self, mode: TxMode) -> Result<()> {
+        let NewTxResponse { transaction_id } = self
+            .inner
+            .new_tx(NewTxRequest {
+                mode: mode.into(),
+                ..Default::default()
+            })
+            .await?
+            .into_inner();
+
+        let tx_md = MetadataValue::try_from(transaction_id).map_err(|_| {
+            Error::Unexpected("invalid tx id (non-ASCII)".into())
+        })?;
+        self.tx_id = Some(tx_md);
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn commit(&mut self) -> Result<()> {
-        let r = self.exec("COMMIT;", Params::new()).await?;
-        if r.ongoing_tx {
-            return Err(Error::Unexpected(
-                "commit left ongoing_tx=true".into(),
-            ));
+        if self.tx_id.is_none() {
+            return Ok(());
         }
+        let req = self.req_with_tx(());
+        let _ = self.inner.commit(req).await?;
+        self.tx_id = None;
         Ok(())
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn rollback(&mut self) -> Result<()> {
-        let _ = self.exec("ROLLBACK;", Params::new()).await?;
+        if self.tx_id.is_none() {
+            return Ok(());
+        }
+        let req = self.req_with_tx(());
+        let _ = self.inner.rollback(req).await;
+        self.tx_id = None;
         Ok(())
     }
 
-    /// Sugar, run in transaction
-    pub async fn with_tx<F, Fut, T>(&mut self, f: F) -> Result<T>
+    #[tracing::instrument(skip_all)]
+    pub async fn with_tx<T, F>(&mut self, mode: TxMode, f: F) -> Result<T>
     where
-        F: FnOnce(&mut SqlClient) -> Fut,
-        Fut: std::future::Future<Output = Result<T>>,
+        F: for<'a> FnOnce(&'a mut SqlClient) -> BoxFut<'a, T>,
     {
-        self.begin().await?;
+        self.begin(mode).await?;
         match f(self).await {
             Ok(v) => {
                 self.commit().await?;

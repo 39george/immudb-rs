@@ -20,6 +20,7 @@ tonic-prost = "0.14"
 uuid = "1.18"
 base64 = "0.22"
 time = { version = "0.3", features = ["local-offset", "macros", "parsing", "serde", "formatting"] }
+tracing = "0.1"
 
 [build-dependencies]
 tonic-prost-build = "0.14"
