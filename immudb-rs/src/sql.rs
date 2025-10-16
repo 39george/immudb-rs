@@ -14,12 +14,22 @@ use crate::client::ImmuDB;
 use crate::error::Error;
 use crate::interceptor::SessionInterceptor;
 use crate::protocol::schema::{
-    NamedParam, SqlExecRequest, SqlExecResult, SqlQueryRequest, SqlQueryResult,
-    SqlValue, immu_service_client::ImmuServiceClient, sql_value,
+    NamedParam, SqlExecRequest, SqlExecResult, SqlQueryRequest, SqlValue,
+    immu_service_client::ImmuServiceClient, sql_value,
 };
 use crate::schema::{NewTxRequest, NewTxResponse, TxMode};
 
 type BoxFut<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
+
+pub trait ToParams {
+    fn to_params(&self) -> crate::sql::Params;
+}
+
+impl<T: ToParams + ?Sized> From<&T> for Params {
+    fn from(t: &T) -> Self {
+        t.to_params()
+    }
+}
 
 /// Request params (@name -> SqlValue)
 #[derive(Debug, Clone)]
@@ -57,6 +67,8 @@ macro_rules! impl_from_for_sqlarg_borrowed {
 
 impl_from_for_sqlarg!(i64, |n| SqlArg::I64(n));
 impl_from_for_sqlarg!(i32, |n| SqlArg::I64(n as i64));
+impl_from_for_sqlarg!(i16, |n| SqlArg::I64(n as i64));
+impl_from_for_sqlarg!(i8, |n| SqlArg::I64(n as i64));
 impl_from_for_sqlarg!(bool, |b| SqlArg::Bool(b));
 impl_from_for_sqlarg!(f64, |f| SqlArg::F64(f));
 impl_from_for_sqlarg!(String, |s| SqlArg::Str(Cow::Owned(s)));
@@ -69,6 +81,11 @@ impl_from_for_sqlarg!(time::OffsetDateTime, |dt: OffsetDateTime| {
     let micros = dt_utc.unix_timestamp_nanos() / 1_000;
     SqlArg::Ts(micros as i64)
 });
+impl_from_for_sqlarg!(u8, |n| SqlArg::I64(n as i64));
+impl_from_for_sqlarg!(u16, |n| SqlArg::I64(n as i64));
+impl_from_for_sqlarg!(u32, |n| SqlArg::I64(n as i64));
+impl_from_for_sqlarg!(u64, |n| SqlArg::I64(n as i64));
+
 impl_from_for_sqlarg_borrowed!('a, &'a str,  |s| SqlArg::Str(Cow::Borrowed(s)));
 impl_from_for_sqlarg_borrowed!('a, &'a [u8], |b| SqlArg::Bytes(Cow::Borrowed(b)));
 
@@ -240,6 +257,32 @@ impl QueryResult {
             .ok_or_else(|| Error::Decode("no columns".into()))?;
         T::try_from(v)
     }
+
+    pub fn first_col_as<T>(&self) -> Result<Vec<T>>
+    where
+        T: TryFrom<SqlValue, Error = Error>,
+    {
+        let mut out = Vec::with_capacity(self.rows.len());
+        for row in &self.rows {
+            let v =
+                row.values.get(0).cloned().ok_or_else(|| {
+                    Error::Decode("row has no columns".into())
+                })?;
+            out.push(T::try_from(v)?);
+        }
+        Ok(out)
+    }
+
+    pub fn one_as<T: DeserializeOwned>(&self) -> Result<T> {
+        if self.rows.len() != 1 {
+            return Err(Error::Decode(format!(
+                "expected 1 row, got {}",
+                self.rows.len()
+            )));
+        }
+        let v = self.row_as_json(0)?;
+        Ok(serde_json::from_value::<T>(v)?)
+    }
 }
 
 fn sql_value_to_json(v: SqlValue) -> JsonValue {
@@ -306,6 +349,13 @@ impl_tryfrom_sqlvalue!(OffsetDateTime, "timestamp (Ts)",
     },
 );
 
+impl_tryfrom_sqlvalue!(uuid::Uuid, "uuid (16 bytes or string)",
+    sql_value::Value::Bs(bs) => uuid::Uuid::from_slice(&bs)
+        .map_err(|e| crate::error::Error::Decode(e.to_string()))?,
+    sql_value::Value::S(s) => uuid::Uuid::parse_str(&s)
+        .map_err(|e| crate::error::Error::Decode(e.to_string()))?,
+);
+
 /// Client: exec/query/tx API
 #[derive(Clone)]
 pub struct SqlClient {
@@ -335,14 +385,17 @@ impl SqlClient {
     }
 
     /// Execute DDL/DML; can handle multiple expressions at a time (with BEGIN/COMMIT)
-    pub async fn exec(
+    pub async fn exec<P>(
         &mut self,
         sql: impl Into<String>,
-        params: Params,
-    ) -> Result<SqlExecResult> {
+        params: P,
+    ) -> Result<SqlExecResult>
+    where
+        P: Into<Params>,
+    {
         let req = SqlExecRequest {
             sql: sql.into(),
-            params: params.into_inner(),
+            params: params.into().into_inner(),
             no_wait: false,
         };
         let resp = if self.tx_id.is_some() {
@@ -356,20 +409,22 @@ impl SqlClient {
     }
 
     /// SELECT; returns a table
-    pub async fn query(
+    pub async fn query<P>(
         &mut self,
         sql: impl Into<String>,
-        params: Params,
-    ) -> Result<QueryResult> {
+        params: P,
+    ) -> Result<QueryResult>
+    where
+        P: Into<Params>,
+    {
         let req = SqlQueryRequest {
             sql: sql.into(),
-            params: params.into_inner(),
+            params: params.into().into_inner(),
             accept_stream: true,
             ..Default::default()
         };
-
+        let req = self.req_with_tx(req);
         let mut stream = if self.tx_id.is_some() {
-            let req = self.req_with_tx(req);
             self.inner.tx_sql_query(req).await?.into_inner()
         } else {
             self.inner.sql_query(req).await?.into_inner()
@@ -419,6 +474,32 @@ impl SqlClient {
         params: Params,
     ) -> Result<Vec<T>> {
         self.query(sql, params).await?.rows_as::<T>()
+    }
+
+    pub async fn query_col<T, P>(
+        &mut self,
+        sql: impl Into<String>,
+        params: P,
+    ) -> Result<Vec<T>>
+    where
+        P: Into<Params>,
+        T: TryFrom<SqlValue, Error = Error>,
+    {
+        let qr = self.query(sql, params).await?;
+        qr.first_col_as()
+    }
+
+    pub async fn query_one_as<T, P>(
+        &mut self,
+        sql: impl Into<String>,
+        params: P,
+    ) -> Result<T>
+    where
+        P: Into<Params>,
+        T: DeserializeOwned,
+    {
+        let qr = self.query(sql, params).await?;
+        qr.one_as()
     }
 
     /// Simple transaction (server keeps ongoing_tx in session)

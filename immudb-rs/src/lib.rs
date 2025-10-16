@@ -1,6 +1,7 @@
 pub use client::ImmuDB;
 pub use protocol::model;
 pub use protocol::schema;
+pub use to_params_derive::ToParams;
 
 mod client;
 mod error;
