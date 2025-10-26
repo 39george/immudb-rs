@@ -85,22 +85,21 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
         interceptor.set_token(token)?;
 
         // 5) Один keepalive-таск на весь клиент
-        let (ka_cancel, ka_handle) = spawn_keepalive(service.clone());
+        let (ka_cancel, _ka_handle) = spawn_keepalive(service.clone());
 
         Ok(ImmuDB {
             service,
             interceptor, // держим, чтобы можно было менять токен позже
             cancel_keep_alive: ka_cancel,
-            _ka_handle: ka_handle,
         })
     }
 }
 
+#[derive(Clone)]
 pub struct ImmuDB {
     service: InterceptedService<Channel, SessionInterceptor>,
     interceptor: SessionInterceptor,
     cancel_keep_alive: CancellationToken,
-    _ka_handle: JoinHandle<()>,
 }
 
 impl ImmuDB {
