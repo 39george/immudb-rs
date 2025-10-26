@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 use bon::Builder;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
 use crate::document::DocClient;
@@ -60,22 +62,45 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
             .open_session(schema::OpenSessionRequest {
                 username: opts.username.into_bytes(),
                 password: opts.password.into_bytes(),
-                database_name: opts.database,
+                database_name: opts.database.clone(),
             })
             .await
             .map_err(Error::from)?
             .into_inner();
 
-        let interceptor = SessionInterceptor::new(session_id, server_uuid);
-        let service = InterceptedService::new(channel, interceptor);
+        let interceptor = SessionInterceptor::new(&session_id, &server_uuid);
+        let service =
+            InterceptedService::new(channel.clone(), interceptor.clone());
 
-        Ok(ImmuDB { service })
+        // 3) Выбираем БД и получаем token
+        let token = ImmuServiceClient::new(service.clone())
+            .use_database(schema::Database {
+                database_name: opts.database.clone(),
+            })
+            .await?
+            .into_inner()
+            .token;
+
+        // 4) Кладём token в интерсептор (теперь authorization будет на всех RPC)
+        interceptor.set_token(token)?;
+
+        // 5) Один keepalive-таск на весь клиент
+        let (ka_cancel, ka_handle) = spawn_keepalive(service.clone());
+
+        Ok(ImmuDB {
+            service,
+            interceptor, // держим, чтобы можно было менять токен позже
+            cancel_keep_alive: ka_cancel,
+            _ka_handle: ka_handle,
+        })
     }
 }
 
-#[derive(Clone)]
 pub struct ImmuDB {
     service: InterceptedService<Channel, SessionInterceptor>,
+    interceptor: SessionInterceptor,
+    cancel_keep_alive: CancellationToken,
+    _ka_handle: JoinHandle<()>,
 }
 
 impl ImmuDB {
@@ -107,6 +132,18 @@ impl ImmuDB {
     pub fn doc(&self) -> DocClient {
         DocClient::new(&self)
     }
+    pub async fn use_database(&self, database: &str) -> Result<()> {
+        let mut cli = ImmuServiceClient::new(self.service.clone());
+        let resp = cli
+            .use_database(schema::Database {
+                database_name: database.to_string(),
+            })
+            .await?
+            .into_inner();
+
+        self.interceptor.set_token(resp.token)?;
+        Ok(())
+    }
 }
 
 impl ImmuDB {
@@ -122,6 +159,7 @@ impl ImmuDB {
 
 impl Drop for ImmuDB {
     fn drop(&mut self) {
+        self.cancel_keep_alive.cancel();
         return;
         let mut client = self.raw_main();
         let _ =
@@ -139,4 +177,25 @@ impl Drop for ImmuDB {
             })
             .join();
     }
+}
+
+fn spawn_keepalive(
+    service: InterceptedService<Channel, SessionInterceptor>,
+) -> (CancellationToken, JoinHandle<()>) {
+    let cancel = CancellationToken::new();
+    let svc = service.clone();
+    let handle = tokio::spawn({
+        let cancel = cancel.clone();
+        async move {
+            let mut cli = ImmuServiceClient::new(svc);
+            let mut tick = tokio::time::interval(Duration::from_secs(30));
+            loop {
+                tokio::select! {
+                    _ = tick.tick() => { let _ = cli.keep_alive(()).await; }
+                    _ = cancel.cancelled() => break,
+                }
+            }
+        }
+    });
+    (cancel, handle)
 }
