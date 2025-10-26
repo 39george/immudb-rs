@@ -4,6 +4,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let root_dir = std::env::current_dir().unwrap();
 
+    if env::var_os("CARGO_PRIMARY_PACKAGE").is_none() {
+        println!(
+            "cargo:warning=tronic: skipping proto codegen (building as dependency)"
+        );
+        return Ok(());
+    }
+
     tonic_prost_build::configure()
         .out_dir(root_dir.join("src/protocol"))
         .file_descriptor_set_path(out_dir.join("types_descriptor.bin"))
