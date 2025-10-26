@@ -2,6 +2,9 @@
 name = "immudb-rs"
 version = "0.1.0"
 edition = "2024"
+exclude = [
+    "proto/**"
+]
 
 [dependencies]
 to_params_derive = { path = "../to_params_derive" }
