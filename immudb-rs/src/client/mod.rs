@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use bon::Builder;
@@ -72,7 +73,6 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
         let service =
             InterceptedService::new(channel.clone(), interceptor.clone());
 
-        // 3) Выбираем БД и получаем token
         let token = ImmuServiceClient::new(service.clone())
             .use_database(schema::Database {
                 database_name: opts.database.clone(),
@@ -81,25 +81,29 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
             .into_inner()
             .token;
 
-        // 4) Кладём token в интерсептор (теперь authorization будет на всех RPC)
         interceptor.set_token(token)?;
 
-        // 5) Один keepalive-таск на весь клиент
         let (ka_cancel, _ka_handle) = spawn_keepalive(service.clone());
 
         Ok(ImmuDB {
-            service,
-            interceptor, // держим, чтобы можно было менять токен позже
-            cancel_keep_alive: ka_cancel,
+            inner: Arc::new(Inner {
+                service,
+                interceptor,
+                cancel: ka_cancel,
+            }),
         })
     }
 }
 
 #[derive(Clone)]
 pub struct ImmuDB {
+    inner: Arc<Inner>,
+}
+
+struct Inner {
     service: InterceptedService<Channel, SessionInterceptor>,
     interceptor: SessionInterceptor,
-    cancel_keep_alive: CancellationToken,
+    cancel: CancellationToken,
 }
 
 impl ImmuDB {
@@ -110,20 +114,20 @@ impl ImmuDB {
         &self,
     ) -> DocumentServiceClient<InterceptedService<Channel, SessionInterceptor>>
     {
-        DocumentServiceClient::new(self.service.clone())
+        DocumentServiceClient::new(self.inner.service.clone())
     }
     pub(crate) fn raw_auth(
         &self,
     ) -> AuthorizationServiceClient<
         InterceptedService<Channel, SessionInterceptor>,
     > {
-        AuthorizationServiceClient::new(self.service.clone())
+        AuthorizationServiceClient::new(self.inner.service.clone())
     }
     pub(crate) fn raw_main(
         &self,
     ) -> ImmuServiceClient<InterceptedService<Channel, SessionInterceptor>>
     {
-        ImmuServiceClient::new(self.service.clone())
+        ImmuServiceClient::new(self.inner.service.clone())
     }
     pub fn sql(&self) -> SqlClient {
         SqlClient::new(&self)
@@ -132,7 +136,7 @@ impl ImmuDB {
         DocClient::new(&self)
     }
     pub async fn use_database(&self, database: &str) -> Result<()> {
-        let mut cli = ImmuServiceClient::new(self.service.clone());
+        let mut cli = ImmuServiceClient::new(self.inner.service.clone());
         let resp = cli
             .use_database(schema::Database {
                 database_name: database.to_string(),
@@ -140,7 +144,7 @@ impl ImmuDB {
             .await?
             .into_inner();
 
-        self.interceptor.set_token(resp.token)?;
+        self.inner.interceptor.set_token(resp.token)?;
         Ok(())
     }
 }
@@ -156,22 +160,23 @@ impl ImmuDB {
     }
 }
 
-impl Drop for ImmuDB {
+impl Drop for Inner {
     fn drop(&mut self) {
-        self.cancel_keep_alive.cancel();
-        return;
-        let mut client = self.raw_main();
+        self.cancel.cancel();
+        let mut client = ImmuServiceClient::new(self.service.clone());
         let _ =
             std::thread::spawn(move || match tokio::runtime::Runtime::new() {
                 Ok(rt) => {
                     rt.block_on(async {
                         if let Err(e) = client.close_session(()).await {
-                            eprintln!("failed to close immudb session: {e:?}");
+                            tracing::error!(
+                                "failed to close immudb session: {e:?}"
+                            );
                         }
                     });
                 }
                 Err(e) => {
-                    eprint!("failed to spawn tokio runtime: {e}");
+                    tracing::error!("failed to spawn tokio runtime: {e}");
                 }
             })
             .join();
@@ -189,8 +194,12 @@ fn spawn_keepalive(
             let mut cli = ImmuServiceClient::new(svc);
             let mut tick = tokio::time::interval(Duration::from_secs(30));
             loop {
+                tracing::trace!("keepalive tick");
                 tokio::select! {
-                    _ = tick.tick() => { let _ = cli.keep_alive(()).await; }
+                    _ = tick.tick() => {
+                        if let Err(e) = cli.keep_alive(()).await {
+                          tracing::warn!(%e, "immudb keepalive failed");
+                        }}
                     _ = cancel.cancelled() => break,
                 }
             }

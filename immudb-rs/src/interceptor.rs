@@ -30,7 +30,6 @@ impl SessionInterceptor {
         }
     }
 
-    /// Обновляем токен после UseDatabase
     pub fn set_token(&self, token: String) -> crate::Result<()> {
         let mv = MetadataValue::try_from(token)
             .map_err(|e| Error::InvalidInput(format!("ascii token: {e:?}")))?;
