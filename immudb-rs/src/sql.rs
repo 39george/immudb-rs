@@ -89,6 +89,18 @@ impl_from_for_sqlarg!(u64, |n| SqlArg::I64(n as i64));
 impl_from_for_sqlarg_borrowed!('a, &'a str,  |s| SqlArg::Str(Cow::Borrowed(s)));
 impl_from_for_sqlarg_borrowed!('a, &'a [u8], |b| SqlArg::Bytes(Cow::Borrowed(b)));
 
+impl<'a, T> From<Option<T>> for SqlArg<'a>
+where
+    T: Into<SqlArg<'a>>,
+{
+    fn from(v: Option<T>) -> Self {
+        match v {
+            Some(x) => x.into(),
+            None => SqlArg::Null,
+        }
+    }
+}
+
 fn arg_to_sql_value(a: SqlArg<'_>) -> SqlValue {
     let v = match a {
         SqlArg::Null => sql_value::Value::Null(0),
@@ -112,14 +124,15 @@ impl Params {
         Self { inner: Vec::new() }
     }
     /// name — without '@'. In sql use `@name`.
-    pub fn bind(
+    pub fn bind<'a>(
         mut self,
         name: impl Into<String>,
-        val: impl Into<SqlArg<'static>>,
+        val: impl Into<SqlArg<'a>>,
     ) -> Self {
+        let arg: SqlArg<'a> = val.into();
         self.inner.push(NamedParam {
             name: name.into(),
-            value: Some(arg_to_sql_value(val.into())),
+            value: Some(arg_to_sql_value(arg)),
         });
         self
     }
