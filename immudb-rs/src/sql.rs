@@ -515,6 +515,23 @@ impl SqlClient {
         qr.one_as()
     }
 
+    pub async fn query_opt_one_as<T, P>(
+        &mut self,
+        sql: impl Into<String>,
+        params: P,
+    ) -> Result<Option<T>>
+    where
+        P: Into<Params>,
+        T: DeserializeOwned,
+    {
+        let qr = self.query(sql, params).await?;
+        match qr.rows.len() {
+            0 => Ok(None),
+            1 => Ok(Some(qr.one_as()?)),
+            n => Err(Error::Decode(format!("expected 0 or 1 row, got {}", n))),
+        }
+    }
+
     /// Simple transaction (server keeps ongoing_tx in session)
     #[tracing::instrument(skip_all)]
     pub async fn begin(&mut self, mode: TxMode) -> Result<()> {
