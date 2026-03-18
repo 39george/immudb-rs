@@ -271,6 +271,27 @@ impl QueryResult {
         T::try_from(v)
     }
 
+    pub fn scalar_opt<T>(&self) -> Result<Option<T>>
+    where
+        T: TryFrom<SqlValue, Error = Error>,
+    {
+        let row = match self.rows.first() {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        let v = row
+            .values
+            .first()
+            .cloned()
+            .ok_or_else(|| Error::Decode("no columns".into()))?;
+
+        match v.value {
+            Some(sql_value::Value::Null(_)) | None => Ok(None),
+            _ => Ok(Some(T::try_from(v)?)),
+        }
+    }
+
     pub fn first_col_as<T>(&self) -> Result<Vec<T>>
     where
         T: TryFrom<SqlValue, Error = Error>,
@@ -530,6 +551,18 @@ impl SqlClient {
             1 => Ok(Some(qr.one_as()?)),
             n => Err(Error::Decode(format!("expected 0 or 1 row, got {}", n))),
         }
+    }
+
+    pub async fn query_opt_scalar<T, P>(
+        &mut self,
+        sql: impl Into<String>,
+        params: P,
+    ) -> Result<Option<T>>
+    where
+        P: Into<Params>,
+        T: TryFrom<SqlValue, Error = Error>,
+    {
+        self.query(sql, params).await?.scalar_opt()
     }
 
     /// Simple transaction (server keeps ongoing_tx in session)
