@@ -61,8 +61,8 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
             server_uuid,
         } = ImmuServiceClient::new(channel.clone())
             .open_session(schema::OpenSessionRequest {
-                username: opts.username.into_bytes(),
-                password: opts.password.into_bytes(),
+                username: opts.username.clone().into_bytes(),
+                password: opts.password.clone().into_bytes(),
                 database_name: opts.database.clone(),
             })
             .await
@@ -83,15 +83,24 @@ impl<State: connect_options_builder::IsComplete> ConnectOptionsBuilder<State> {
 
         interceptor.set_token(token)?;
 
-        let (ka_cancel, _ka_handle) = spawn_keepalive(service.clone());
+        let ka_cancel = CancellationToken::new();
 
-        Ok(ImmuDB {
+        let db = ImmuDB {
             inner: Arc::new(Inner {
                 service,
+                channel,
                 interceptor,
-                cancel: ka_cancel,
+                cancel: ka_cancel.clone(),
+                username: opts.username,
+                password: opts.password,
+                database: opts.database,
+                reopen_lock: tokio::sync::Mutex::new(()),
             }),
-        })
+        };
+
+        spawn_keepalive(db.clone(), ka_cancel);
+
+        Ok(db)
     }
 }
 
@@ -102,8 +111,13 @@ pub struct ImmuDB {
 
 struct Inner {
     service: InterceptedService<Channel, SessionInterceptor>,
+    channel: Channel,
     interceptor: SessionInterceptor,
     cancel: CancellationToken,
+    username: String,
+    password: String,
+    database: String,
+    reopen_lock: tokio::sync::Mutex<()>,
 }
 
 impl ImmuDB {
@@ -147,6 +161,37 @@ impl ImmuDB {
         self.inner.interceptor.set_token(resp.token)?;
         Ok(())
     }
+    pub async fn reopen_session(&self) -> Result<()> {
+        let _guard = self.inner.reopen_lock.lock().await;
+
+        let schema::OpenSessionResponse {
+            session_id,
+            server_uuid,
+        } = ImmuServiceClient::new(self.inner.channel.clone())
+            .open_session(schema::OpenSessionRequest {
+                username: self.inner.username.clone().into_bytes(),
+                password: self.inner.password.clone().into_bytes(),
+                database_name: self.inner.database.clone(),
+            })
+            .await?
+            .into_inner();
+
+        self.inner
+            .interceptor
+            .set_session(session_id, server_uuid)?;
+
+        let token = ImmuServiceClient::new(self.inner.service.clone())
+            .use_database(schema::Database {
+                database_name: self.inner.database.clone(),
+            })
+            .await?
+            .into_inner()
+            .token;
+
+        self.inner.interceptor.set_token(token)?;
+
+        Ok(())
+    }
 }
 
 impl ImmuDB {
@@ -183,27 +228,47 @@ impl Drop for Inner {
     }
 }
 
-fn spawn_keepalive(
-    service: InterceptedService<Channel, SessionInterceptor>,
-) -> (CancellationToken, JoinHandle<()>) {
-    let cancel = CancellationToken::new();
-    let svc = service.clone();
-    let handle = tokio::spawn({
-        let cancel = cancel.clone();
-        async move {
-            let mut cli = ImmuServiceClient::new(svc);
-            let mut tick = tokio::time::interval(Duration::from_secs(30));
-            loop {
-                tracing::trace!("keepalive tick");
-                tokio::select! {
-                    _ = tick.tick() => {
-                        if let Err(e) = cli.keep_alive(()).await {
-                          tracing::warn!(%e, "immudb keepalive failed");
-                        }}
-                    _ = cancel.cancelled() => break,
+fn spawn_keepalive(db: ImmuDB, cancel: CancellationToken) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(30));
+
+        loop {
+            tracing::trace!("keepalive tick");
+
+            tokio::select! {
+                _ = tick.tick() => {
+                    let mut cli = db.raw_main();
+
+                    match cli.keep_alive(()).await {
+                        Ok(_) => {}
+
+                        Err(e) if is_session_not_found(&e) => {
+                            tracing::warn!(
+                                %e,
+                                "immudb session expired, reopening session"
+                            );
+
+                            if let Err(reopen_err) = db.reopen_session().await {
+                                tracing::error!(
+                                    ?reopen_err,
+                                    "failed to reopen immudb session"
+                                );
+                            }
+                        }
+
+                        Err(e) => {
+                            tracing::warn!(%e, "immudb keepalive failed");
+                        }
+                    }
                 }
+
+                _ = cancel.cancelled() => break,
             }
         }
-    });
-    (cancel, handle)
+    })
+}
+
+fn is_session_not_found(status: &tonic::Status) -> bool {
+    status.code() == tonic::Code::PermissionDenied
+        && status.message().contains("session not found")
 }
